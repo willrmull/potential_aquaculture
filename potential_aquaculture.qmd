@@ -1,0 +1,128 @@
+---
+title: "potential_aquaculture"
+format: html
+editor: visual
+---
+
+## Loading Packages
+
+```{r, warning = FALSE, message = FALSE}
+reqired_packages <- c("terra", "tidyverse", "here", "knitr", "kableExtra")
+
+for(pkg in reqired_packages){
+  if (!require(pkg, character.only = TRUE)){
+     stop(paste0("Package '", pkg, "' is not installed"))
+  } 
+}
+
+# Load required packages
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(terra)
+  library(here)
+  library(knitr)
+  library(kableExtra)
+})
+```
+
+## Data Processing
+
+------------------------------------------------------------------------
+
+### Sea Surface Temperature
+
+```{r, warning = FALSE, message = FALSE}
+sst <- rast(c(here("data", "average_annual_sst_2008.tif"),
+              here("data", "average_annual_sst_2009.tif"),
+              here("data", "average_annual_sst_2010.tif"),
+              here("data", "average_annual_sst_2011.tif"),
+              here("data", "average_annual_sst_2012.tif")))
+
+# Read in depth file
+depth <- rast(here("data", "depth.tif")) %>%
+  project(crs(mean_sst))
+
+# Read in EEZ Data and convert it to a raster
+eez_raster <- vect(here::here("data", "wc_regions_clean.shp")) %>% 
+  rasterize(oyster_habitat, field = "rgn")
+
+
+mean_sst <- app(sst, fun=mean, na.rm = TRUE)
+
+# Convert From Kelvin to Celcius
+mean_sst <- mean_sst - 273.15
+plot(mean_sst)
+```
+
+### Prepare Depth Raster
+
+```{r, warning = FALSE, message = FALSE}
+# Resample depth using nearest neighbor approach
+depth <- resample(depth, mean_sst, method = "near")
+
+# Crop raster to match SST
+depth_cropped<- crop(depth, mean_sst)
+
+# check that the depth and SST match in resolution, extent, and coordinate reference system
+compareGeom(depth_cropped, mean_sst, res = TRUE, ext = TRUE, crs = TRUE)
+
+```
+### Suitable Area by Region
+```{r, warning = FALSE, message = FALSE}
+habitable_areas <- function(temp_min, temp_max, depth_min, depth_max, species_name){
+  # Create mask of sst and depth values in range
+  sst_suitable <- mean_sst >= temp_min & mean_sst <= temp_max
+  depth_suitable <- depth_cropped >= depth_min & depth_cropped <= depth_max
+  # Create mask where both ofthe above conditions are met
+  suitable_habitat <- sst_suitable * depth_suitable
+  
+  # Plot of suitable habitats
+  habitat_plot <- plot(suitable_habitat,
+       col = c("gray90", "maroon"),
+       type = "classes",
+       levels = c("Unsuitable", "Suitable"),
+       main = paste("Potential", species_name, 
+                    "Habitat\n(SST:", temp_min, "-", temp_max, 
+                    "C, Depth:", depth_min, "-", depth_max, "m)"),
+       xlab = "Longitude",
+       ylab = "Latitude",
+       axes = TRUE,
+       plg = list(x = "topright", title = "Classification") # Legend position
+  )
+  # Return the plot
+  return (habitat_plot)
+}
+```
+
+### Plot of Areas Habitable by Oysters
+
+```{r, warning = FALSE, message = FALSE}
+# View Areas Habitable by Oysters
+oysters <- habitable_areas(11, 30, 0, 70, "Oyster")
+```
+### Plot of Areas Habitable by Blue Mussles
+```{r, warning = FALSE, message = FALSE}
+mussles <- habitable_areas(5, 20, 0, 60, "Blue Mussle")
+```
+### Habitable Area by Region
+```{r, warning = FALSE, message = FALSE}
+# Returns a data frame of the area suitable fora species by region
+habitable_areas <- function(temp_min, temp_max, depth_min, depth_max, species_name){
+  sst_suitable <- mean_sst >= temp_min & mean_sst <= temp_max
+  depth_suitable <- depth_cropped >= depth_min & depth_cropped <= depth_max
+  suitable_habitat <- sst_suitable * depth_suitable
+  # Get the cell size of cells in dataframe
+  cell_area <- cellSize(suitable_habitat, unit = "km")
+  # Get area of suitable cells in dataframe
+  area_suitable <- cell_area * suitable_habitat
+  # Get the total amount of area that is suitable in each EEZ
+  total_area_by_eez <- zonal(area_suitable, eez_raster, fun = "sum", na.rm = TRUE)
+  return(total_area_by_eez)
+}
+
+oyster_data <- habitable_areas(11, 30, 0, 70, "Oyster") %>% rename("Oysters" = area)
+mussle_data <- habitable_areas(5, 20, 0, 60, "Blue Mussle") %>%rename("Blue Mussle" = area)
+inner_join(oyster_data, mussle_data, by = "rgn") %>% 
+  rename("Region" = rgn) %>%
+  kbl(format = "html", caption = "Suitable Area For Oysters and Blue Mussles")
+```
