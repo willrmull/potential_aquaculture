@@ -1,10 +1,26 @@
 ---
-title: "potential_aquaculture"
-format: html
+title: "Identifying Areas of Potential Aquaculture in the Western US"
+format: pdf
 editor: visual
 ---
 
-## Loading Packages
+**Author** William Mullins \| Date: December 10, 2025 [View Repository on Github](https://github.com/willrmull/potential_aquaculture.git)
+
+## Introduction
+
+In this analysis, we identified areas along the west coast of the United States which contained suitable depth and sea surface temperature (SST) for aquaculture, specifically on two species: oysters and blue mussels.
+
+------------------------------------------------------------------------
+
+### Datasets Used
+
+-   [NOAA Pathfinder Sea Surface Temperature Data](https://coralreefwatch.noaa.gov/product/5km/index_5km_ssta.php): Data from this is used to find the five-year average of sea surface temperature data from 2008-2012, providing a baseline for temperature analysis along the western US coast.
+-   [NOAA Bathymetry Data](https://www.gebco.net/data-products/gridded-bathymetry-data#area): High-resolution ocean depth measurements used to identify suitable depths for shellfish cultivation.
+-   [West Coast Regional Boundaries](https://www.marineregions.org/eez.php): Spatial boundaries defining the Exclusive Economic Zones (EEZs) for California, Oregon, and Washington, used to calculate suitable habitat area by region.
+
+------------------------------------------------------------------------
+
+### Loading Packages
 
 ```{r, warning = FALSE, message = FALSE}
 reqired_packages <- c("terra", "tidyverse", "here", "knitr", "kableExtra")
@@ -25,11 +41,19 @@ suppressPackageStartupMessages({
 })
 ```
 
-## Data Processing
+------------------------------------------------------------------------
+
+### Data Import and Processing
 
 ------------------------------------------------------------------------
 
-### Sea Surface Temperature
+### Data Import
+
+The following section imports the three datasets used in the analysis. We implement validation checks to ensure files exist before attempting to load them.
+
+-   The SST data are stored as individual GeoTIFF files, each representing the average annual SST for a given year. These rasters are stacked into a single multi-layer raster object.
+-   The bathymetry raster is then imported and reprojected to match the coordinate reference system of the SST stack.
+-   The EEZ boundaries are read as a vector layer.
 
 ```{r, warning = FALSE, message = FALSE}
 sst <- rast(c(here("data", "average_annual_sst_2008.tif"),
@@ -40,21 +64,34 @@ sst <- rast(c(here("data", "average_annual_sst_2008.tif"),
 
 # Read in depth file
 depth <- rast(here("data", "depth.tif")) %>%
-  project(crs(mean_sst))
+  project(crs(sst))
 
-# Read in EEZ Data and convert it to a raster
-eez_raster <- vect(here::here("data", "wc_regions_clean.shp")) %>% 
-  rasterize(oyster_habitat, field = "rgn")
-
-
-mean_sst <- app(sst, fun=mean, na.rm = TRUE)
-
-# Convert From Kelvin to Celcius
-mean_sst <- mean_sst - 273.15
-plot(mean_sst)
+eez_raster <- vect(here::here("data", "wc_regions_clean.shp"))
 ```
 
-### Prepare Depth Raster
+### Data Processing
+
+To find the temporal mean SST across the 2008–2012 period, we compute the average across the raster stack. Since the original values are in Kelvin, we convert them to Celsius by subtracting 273.15.
+
+```{r}
+# Change Margins on top and bottom
+par(oma = c(1, 0, 3, 0))
+
+# Create an informative plot of mean SST
+plot(mean_sst,
+     main = "Mean Sea Surface Temperature \n(2008-2012)",
+     col = hcl.colors(40, "RdYlBu", rev = TRUE),
+     xlab = "Longitude",
+     ylab = "Latitude",
+     cex.main = 1.0,
+     plg = list(title = "SST (°C)"))
+```
+
+\*Interpretation\*\*: This map reveals the characteristic temperature gradient along the US West Coast. Southern California exhibits the warmest waters (20-25°C), while the Pacific Northwest and areas influenced by coastal upwelling show cooler temperatures (10-15°C). This spatial variation in temperature has important implications for species-specific aquaculture siting, as different shellfish species have distinct thermal tolerances.
+
+### Depth Data Preparation
+
+The depth raster is resampled to match the resolution and extent of the SST data using nearest neighbor interpolation. This ensures that both datasets align perfectly for subsequent analysis.
 
 ```{r, warning = FALSE, message = FALSE}
 # Resample depth using nearest neighbor approach
@@ -66,63 +103,201 @@ depth_cropped<- crop(depth, mean_sst)
 # check that the depth and SST match in resolution, extent, and coordinate reference system
 compareGeom(depth_cropped, mean_sst, res = TRUE, ext = TRUE, crs = TRUE)
 
+# Verify alignment of datasets
+alignment_check <- compareGeom(depth_cropped, mean_sst, res = TRUE, ext = TRUE, crs = TRUE)
+
+
+if (!alignment_check) {
+  stop(
+    "Depth and SST rasters are not properly aligned! Check resolution, extent, and CRS of both datasets. ",
+    call. = FALSE
+  )
+} else {
+  message("Depth and SST rasters are properly aligned (resolution, extent, and CRS match)")
+}
 ```
-### Suitable Area by Region
+
+## **Habitat Suitability Analysis**
+
+To evaluate the potential of locations for marine aquaculture of a given species, we use measurements of environmental tolerances. Using these thresholds, each pixel in the study area is classified as either suitable or unsuitable based on whether it simultaneously satisfies both temperature and depth criteria.
+
+\### Suitability Function
+
+The \`find_suitable_habitat()\` function implements this logic by first generating binary masks for temperature and depth suitability. The rasters are then combined, producing a categorical raster containing locations where both conditions are met.
+
 ```{r, warning = FALSE, message = FALSE}
-habitable_areas <- function(temp_min, temp_max, depth_min, depth_max, species_name){
-  # Create mask of sst and depth values in range
+# Function for identifying and plotting suitable habitats
+find_suitable_habitat <- function(temp_min, temp_max, depth_min, depth_max, species_name) {
+  
+  # Create binary masks for suitable conditions
   sst_suitable <- mean_sst >= temp_min & mean_sst <= temp_max
   depth_suitable <- depth_cropped >= depth_min & depth_cropped <= depth_max
-  # Create mask where both ofthe above conditions are met
+  
+  # Combine masks where both conditions are met
   suitable_habitat <- sst_suitable * depth_suitable
   
-  # Plot of suitable habitats
-  habitat_plot <- plot(suitable_habitat,
-       col = c("gray90", "maroon"),
+  # Convert to factor
+  suitable_habitat <- as.factor(suitable_habitat)
+  levels(suitable_habitat) <- c("Unsuitable", "Suitable")
+  
+  # Create informative plot
+  par(oma = c(1, 1, 1.5, 1))
+  
+  plot(suitable_habitat,
+       col = c("#D3D3D3", "#228B22"),
        type = "classes",
-       levels = c("Unsuitable", "Suitable"),
-       main = paste("Potential", species_name, 
-                    "Habitat\n(SST:", temp_min, "-", temp_max, 
-                    "C, Depth:", depth_min, "-", depth_max, "m)"),
+       main = paste0("Potential ", species_name, " Aquaculture Habitat\nSST: ", temp_min, "–", temp_max, "°C | Depth: ", depth_min, "–", depth_max, " m"),
        xlab = "Longitude",
        ylab = "Latitude",
        axes = TRUE,
-       plg = list(x = "topright", title = "Classification") # Legend position
-  )
-  # Return the plot
-  return (habitat_plot)
+       cex.main = 0.8,
+       plg = list(x = "topright", title = "Suitability"))
+  
+  # Return the raster
+  return(suitable_habitat)
 }
 ```
 
-### Plot of Areas Habitable by Oysters
+### Map of Potential Oyster Habitats
+
+Oysters prefer slighly warm waters (11-30°C) and are able to be cultivated in shallow depths (0-70 meters).
 
 ```{r, warning = FALSE, message = FALSE}
 # View Areas Habitable by Oysters
-oysters <- habitable_areas(11, 30, 0, 70, "Oyster")
+oyster_habitat <- find_suitable_habitat(
+  temp_min = 11,
+  temp_max = 30,
+  depth_min = 0,
+  depth_max = 70,
+  species_name = "Oyster"
+)
 ```
-### Plot of Areas Habitable by Blue Mussles
+
+**Interpretation**: This map shows that suitable areas are concentrated along the coast of Southern California and in Washington. Cincentration is low along the coast of Northern California and Oregon. The cooler waters of Oregon and Washington limit suitable habitat primarily to nearshore areas where depths fall within the required range.
+
+### Map of Potential Mussel Habitats
+
+The species of blue mussels native to the West Coast, *Mytilus trossulus*, are much more cold-adapted in comparison to oysters. Although estimates vary, most sources cite a temperature range between -1°C and 20°C, with reduced growth and survival when temperatures exceed 18°C. Blue mussels are also typically found in shallower depths (0-24 meters).
+
 ```{r, warning = FALSE, message = FALSE}
-mussles <- habitable_areas(5, 20, 0, 60, "Blue Mussle")
+# Identify suitable habitat for blue mussels
+mussel_habitat <- find_suitable_habitat(
+  temp_min = -1,
+  temp_max = 20,
+  depth_min = 0,
+  depth_max = 24,
+  species_name = "Blue Mussel"
+)
 ```
-### Habitable Area by Region
+
+## **Regional Analysis of Suitable Habitat**
+
+To quantify aquaculture potential by jurisdiction, we calculate the total area of suitable habitat within each state's Exclusive Economic Zone.
+
+### **Calculating Suitable Area by Region**
+
+This function builds upon the habitat suitability analysis by calculating the total area (in square kilometers) of suitable habitat within each region.
+
 ```{r, warning = FALSE, message = FALSE}
 # Returns a data frame of the area suitable fora species by region
-habitable_areas <- function(temp_min, temp_max, depth_min, depth_max, species_name){
+total_habitable_areas <- function(temp_min, temp_max, depth_min, depth_max, species_name){
+  
+  # Create suitability masks
   sst_suitable <- mean_sst >= temp_min & mean_sst <= temp_max
   depth_suitable <- depth_cropped >= depth_min & depth_cropped <= depth_max
   suitable_habitat <- sst_suitable * depth_suitable
-  # Get the cell size of cells in dataframe
+  
+  # Rasterize EEZ regions
+  eez_raster <- rasterize(eez_raster, suitable_habitat, field = "rgn")
+  
+  # Calculate cell area 
   cell_area <- cellSize(suitable_habitat, unit = "km")
+  
   # Get area of suitable cells in dataframe
   area_suitable <- cell_area * suitable_habitat
-  # Get the total amount of area that is suitable in each EEZ
+  
+  # Get the total area that is suitable in each EEZ
   total_area_by_eez <- zonal(area_suitable, eez_raster, fun = "sum", na.rm = TRUE)
+  
   return(total_area_by_eez)
 }
 
-oyster_data <- habitable_areas(11, 30, 0, 70, "Oyster") %>% rename("Oysters" = area)
-mussle_data <- habitable_areas(5, 20, 0, 60, "Blue Mussle") %>%rename("Blue Mussle" = area)
-inner_join(oyster_data, mussle_data, by = "rgn") %>% 
-  rename("Region" = rgn) %>%
-  kbl(format = "html", caption = "Suitable Area For Oysters and Blue Mussles")
 ```
+
+### Table of Suitable Area by Region
+
+```{r}
+# Calculate suitable area for each species
+
+oyster_area <- total_habitable_areas(
+  temp_min = 11,
+  temp_max = 30,
+  depth_min = 0,
+  depth_max = 70,
+  species_name = "Oyster") %>% 
+  rename("Oysters" = area)
+
+mussel_area <- total_habitable_areas(  
+  temp_min = -1,
+  temp_max = 20,
+  depth_min = 0,
+  depth_max = 24,
+  species_name = "Blue Mussel") %>%
+  rename("Blue Mussle" = area)
+
+
+# Join results and create formatted table
+habitat_summary <- inner_join(oyster_area, mussel_area, by = "rgn") %>%
+  rename("Region" = rgn) %>%
+  mutate(across(where(is.numeric), ~round(.x, 2))) %>%
+  kbl(
+    caption = "Suitable Area For Oysters and Blue Mussles",
+    align = c("l", "r", "r")
+  ) %>% 
+    kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed"),
+    full_width = FALSE
+  ) %>%
+  add_header_above(c(" " = 1, "Suitable Area (km²)" = 2))
+
+habitat_summary
+
+```
+
+**Interpretation**:
+
+1.  **Washington** has the most suitable habitat for blue mussels (260.91 km²), which is more than double all of the other regions. This is likely caused by the cold waters of the state and large amount of shallow water found in regions like the Puget Sound.
+
+2.  **Southern California** leads in oyster habitat suitability (160.53 km²), likely due to their warmer waters.
+
+3.  **Oregon** shows a strong preference for mussels over oysters (76.65 km² vs. 30.11 km²), which is expected to to it's cooler waters.
+
+4.  **Central California** shows relatively low suitability for both species. It is unclear if this is caused by the temperature range or a lack of shallow waters.
+
+### Implications for Aquaculture Development
+
+Although the West Coast appears to have a larger total area suited to blue mussels, oyster farming currently dominates every region. This mismatch between environmental suitability and current industry patterns may indicate **untapped potential for blue mussel aquaculture**, particularly in Washington and Oregon where there is a significantly larger area suitable for mussels than oysters.
+
+### **Limitations**
+
+While this analysis provides a solid foundation for further research, it has some limitations that should be addressed in future research:
+
+1.  **Temporal Resolution**: The data uses annual SST, which does not account for seasonal variations in ocean conditions. Locations which experience extreme seasonal differences are likely to go undetected using this method, which could result in false positives being introduced.
+
+2.  **Environmental factors not considered:** Important variables such as acidity, tidal patterns, wave exposure, and El Nino events were not included in the analysis.
+
+3.  **Socioeconomic and Regulatory Constraints**: Shipping lanes, marine protected areas, and competing ocean uses were not incorporated into the suitability model.
+
+## Future research 
+
+In addition to adressing the above limitation, future research should investigate the economic viability of establishing mussel production in areas identified as suitable. Additionally, climate forecast should be included in the analysis to see if sites are likely to remain suitable in the future.
+
+### **References**
+
+National Oceanic and Atmospheric Administration. (2023). NOAA CoastWatch Pathfinder Sea Surface Temperature Dataset.[**https://podaac.jpl.nasa.gov/dataset/AVHRR_PATHFINDER_L3_V52**](https://podaac.jpl.nasa.gov/dataset/AVHRR_PATHFINDER_L3_V52)
+
+National Centers for Environmental Information. (2023). Gridded Bathymetry Data.[**https://www.ncei.noaa.gov/access/gridded-bathymetry-data**](https://www.ncei.noaa.gov/access/gridded-bathymetry-data)
+
+NOAA Fisheries. (2023). West Coast Regional Boundaries.[**https://www.fisheries.noaa.gov/west-coast/marine-protected-areas/west-coast-regional-boundaries**](https://www.fisheries.noaa.gov/west-coast/marine-protected-areas/west-coast-regional-boundaries)
+
+Food and Agriculture Organization. (2022). The State of World Fisheries and Aquaculture.[**https://www.fao.org/3/ca9229en/ca9229en.pdf**](https://www.fao.org/3/ca9229en/ca9229en.pdf)
