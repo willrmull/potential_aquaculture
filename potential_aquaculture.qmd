@@ -4,11 +4,17 @@ format: pdf
 editor: visual
 ---
 
-**Author** William Mullins \| Date: December 10, 2025 [View Repository on Github](https://github.com/willrmull/potential_aquaculture.git)
+**Author** William Mullins \| Date: December 10, 2025 
 
 ## Introduction
 
-In this analysis, we identified areas along the west coast of the United States which contained suitable depth and sea surface temperature (SST) for aquaculture, specifically on two species: oysters and blue mussels.
+Does the suitable habitat area for oyster and blue mussel aquaculture differ across the western United States coast?
+
+Oysters currently dominate mollusk aquaculture across the West Coast. According to the USDA 2023 Census of Aquaculture, mollusks account for 30% of all aquaculture sales in California, with oysters alone representing 26.6 percentage points—indicating that roughly 89% of California's mollusk aquaculture production is derived from oysters. Oregon and Washington show similar patterns of oyster dominance within their shellfish industries (USDA, 2024).
+
+The relative lack of species diversification raises concerns about industry resilience. Region-wide stressors such as increasing ocean acidification or species-specific pathogens like Vibrio infections could simultaneously impact the majority of mollusk aquaculture facilities. The native blue mussel (Mytilus trossulus) represents a potential diversification candidate due to its different thermal tolerance nd established presence along the Pacific Coast.
+
+This analysis investigates whether the current dominance of oysters is driven by environmental suitability by comparing suitable habitat areas for oysters versus blue mussels within the Exclusive Economic Zones of California, Oregon, and Washington. Suitable areas were classified by identifying locations where both sea surface temperature and depth fell within each species' tolerance range.
 
 ### Datasets Used
 
@@ -117,7 +123,7 @@ To evaluate the potential of locations for marine aquaculture of a given species
 
 ### Suitability Function
 
-The \`find_suitable_habitat()\` function implements this logic by first generating binary masks for temperature and depth suitability. The rasters are then combined, producing a categorical raster containing locations where both conditions are met.
+The `find_suitable_habitat()` function implements this logic by first generating binary masks for temperature and depth suitability. The rasters are then combined, producing a categorical raster containing locations where both conditions are met.
 
 ```{r, warning = FALSE, message = FALSE}
 # Function for identifying and plotting suitable habitats
@@ -142,7 +148,7 @@ find_suitable_habitat <- function(temp_min, temp_max, depth_min, depth_max, spec
        ylab = "Latitude",
        axes = TRUE,
        cex.main = 0.8,
-       plg = list(x = "topright", title = "Suitability"))
+       plg = list(x = "topright", cex = 0.75, title = "Suitability"))
 
   # Return the raster
   return(suitable_habitat)
@@ -164,7 +170,7 @@ oyster_habitat <- find_suitable_habitat(
 )
 ```
 
-**Interpretation**: This map shows that suitable areas are concentrated along the coast of Southern and Central California, with a large area also being present in Washington. Oregon and North California appear to have significantly smaller amounts of suitable area.
+**Interpretation**: This map shows that suitable oyster habitat is concentrated along the coast of Southern and Central California, with a substantial area also present in Washington. The warmer waters of Southern California are particularly favorable, while Washington's extensive shallow coastal areas likely contribute to its suitability. Oregon and Northern California appear to have significantly smaller amounts of suitable area, likely due to cooler water temperatures from coastal upwelling.
 
 ### Map of Potential Mussel Habitats
 
@@ -181,7 +187,7 @@ mussel_habitat <- find_suitable_habitat(
 )
 ```
 
-**Interpretation**: This map shows that suitable areas are primarily found within Washington, with a large cluster also being present in the Bay area. Outside of that, mussels appear to have a much smaller amount of suitable area in comparison to Oysters overall.
+**Interpretation**: This map shows that suitable blue mussel habitat is primarily found within Washington, with a secondary cluster present in the San Francisco Bay area of Central California. The native blue mussel's is cold-adapted and restricted to shallower depths, which significantly limits suitable area compared to oysters. Washington's cooler waters and extensive shallow coastal zones in areas like Puget Sound likley make it the most favorable region.
 
 ## **Regional Analysis of Suitable Habitat**
 
@@ -259,19 +265,23 @@ habitat_summary
 
 **Interpretation**:
 
-1.  **Washington** has the most suitable habitat for blue mussels (2878.92 km²), which is more than a thousand higher than the next highest region. This is likely caused by the cold waters of the state and large amount of shallow water found in regions like the Puget Sound.
+1.  **Washington** has the most suitable habitat for blue mussels (2,878.92 km²), which is almost double the amount of the next highest region. This is likely due to the cold waters of the state and extensive shallow areas found in regions like Puget Sound.
 
-2.  **Central California** leads in oyster habitat suitability (1578.97 km²), likely due to their warmer waters. In this region there is a significant disparity between suitable oyster habitat and mussel habitat.
+2.  **Central California** leads in oyster habitat suitability (4,940.04 km²), likely due to its warmer waters. This region shows a significant disparity between suitable oyster and mussel habitat (4,940 km² vs. 1,534 km²).
 
-3.  **Oregon** shows a slight preference for mussels over oysters (76.65 km² vs. 1181.82 km²), which could be caused by it's slightly cooler waters or a limited amount of shallow areas.
+3.  **Oregon** shows a slight preference for oysters over mussels (1,578.97 km² vs. 1,181.82 km²), though conditions are relatively balanced for both species.
 
-4.  **Southern California** shows high suitability for oysters (4221.39 km²) with below average suitability for mussels.
+4.  **Southern California** shows high suitability for oysters (4,221.39 km²) with below-average suitability for mussels (1,140.71 km²), consistent with its warmer waters exceeding the mussel temperature tolerance.
 
-5.  **Northern California** seems to be rather unaccommodating for both species, though mussels are somewhat favored.
+5.  **Northern California**  is the only region where mussel-suitable habitat (748.67 km²) exceeds oyster-suitable area (454.30 km²), likely due to cooler waters from coastal upwelling.
 
 ### Implications for Aquaculture Development
 
-While oyster farming currently dominates all regions, the results of this analysis suggest this may not entirely align with maximizing the environment's potential for aquaculture. Specifically, Central and Southern California's substantial oyster-suitable areas (4,940 km² and 4,221 km² respectively) support continued industry focus on oysters in these regions. However, Northern California presents a compelling case for blue mussel expansion, as mussel-suitable habitat (749 km²) actually exceeds oyster-suitable area (454 km²), which is not reflected in current farming practices. Additionally, Washington and Oregon have much closer margins in suitable areas between the two species, which could be worth investigating for aquaculture diversification. Overall, more analysis should be done to determine the extent to which these suitable areas overlap, and whether other parameters such as local infrastructure, market access, regulatory frameworks, or additional environmental factors may affect habitat suitability and commercial viability.
+The results of this analysis suggest that the current dominance of oyster aquaculture along the West Coast may not fully reflect the environmental potential for species diversification. The suitability analysis revealed that opportunities for blue mussel cultivation appear to remain largely untapped. Washington emerges as the most promising region for mussel diversification, with 2,879 km² of suitable habitat—more than double that of any other region. Northern California also presents a compelling case, as mussel-suitable habitat (749 km²) exceeds oyster-suitable area (454 km²), a pattern not reflected in current farming practices.
+
+Central and Southern California's substantial oyster-suitable areas (4,940 km² and 4,221 km² respectively) support the industry's continued focus on oysters in these regions. However, it is worth noting that the majority of oyster farming is located in the northern half of the state, indicating that these southern regions may be generally underutilized for shellfish production. Oregon shows relatively balanced conditions for both species, with a slight advantage for oysters (1,579 km² vs. 1,182 km² for mussels).
+
+These findings are significant when viewed through the lens of industry resilience. As noted in the introduction, approximately 89% of California's mollusk aquaculture production derives from oysters. This concentration leaves the industry vulnerable to the region-wide stressors identified earlier: increasing ocean acidification and species-specific pathogens. The identification of viable mussel habitat—particularly in Washington and Northern California—suggests that diversification is not only environmentally feasible but may serve as a buffer against future disruptions.
 
 **Limitations**
 
@@ -289,10 +299,12 @@ In addition to adressing the above limitation, future research should investigat
 
 ### **References**
 
+Food and Agriculture Organization. (2022). The State of World Fisheries and Aquaculture.[**https://www.fao.org/3/ca9229en/ca9229en.pdf**](https://www.fao.org/3/ca9229en/ca9229en.pdf)
+
 National Oceanic and Atmospheric Administration. (2023). NOAA CoastWatch Pathfinder Sea Surface Temperature Dataset.[**https://podaac.jpl.nasa.gov/dataset/AVHRR_PATHFINDER_L3_V52**](https://podaac.jpl.nasa.gov/dataset/AVHRR_PATHFINDER_L3_V52)
 
 National Centers for Environmental Information. (2023). Gridded Bathymetry Data.[**https://www.ncei.noaa.gov/access/gridded-bathymetry-data**](https://www.ncei.noaa.gov/access/gridded-bathymetry-data)
 
-NOAA Fisheries. (2023). West Coast Regional Boundaries.[**https://www.fisheries.noaa.gov/west-coast/marine-protected-areas/west-coast-regional-boundaries**](https://www.fisheries.noaa.gov/west-coast/marine-protected-areas/west-coast-regional-boundaries)
+NOAA Fisheries. (2023). West Coast Regional Boundaries.[**https://www.fisheries.noaa.gov/west-coast/marine-protected-areas/west-coast-regional-boundaries**](https://www.fisheries.noaa.gov/west
 
-Food and Agriculture Organization. (2022). The State of World Fisheries and Aquaculture.[**https://www.fao.org/3/ca9229en/ca9229en.pdf**](https://www.fao.org/3/ca9229en/ca9229en.pdf)
+United States Department of Agriculture (USDA) National Agricultural Statistics Service. 2024. 2023 Census of Aquaculture.[ https://www.nass.usda.gov/Publications/AgCensus/2022/Online_Resources/Aquaculture/index.php]( https://www.nass.usda.gov/Publications/AgCensus/2022/Online_Resources/Aquaculture/index.php)
