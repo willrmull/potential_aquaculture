@@ -4,8 +4,6 @@ format: pdf
 editor: visual
 ---
 
-![README](README.png)
-
 **Author** William Mullins \| Date: December 10, 2025 [View Repository on Github](https://github.com/willrmull/potential_aquaculture.git)
 
 ## Introduction
@@ -102,7 +100,6 @@ compareGeom(depth_cropped, mean_sst, res = TRUE, ext = TRUE, crs = TRUE)
 
 # Verify alignment of datasets
 alignment_check <- compareGeom(depth_cropped, mean_sst, res = TRUE, ext = TRUE, crs = TRUE)
-
 
 if (!alignment_check) {
   stop(
