@@ -39,6 +39,9 @@ National Oceanic and Atmospheric Administration. (2023). NOAA CoastWatch Pathfin
 
 National Centers for Environmental Information. (2023). Gridded Bathymetry Data.[**https://www.ncei.noaa.gov/access/gridded-bathymetry-data**](https://www.ncei.noaa.gov/access/gridded-bathymetry-data)
 
+
 NOAA Fisheries. (2023). West Coast Regional Boundaries.[**https://www.fisheries.noaa.gov/west-coast/marine-protected-areas/west-coast-regional-boundaries**](https://www.fisheries.noaa.gov/west-coast/marine-protected-areas/west-coast-regional-boundaries)
 
 Food and Agriculture Organization. (2022). The State of World Fisheries and Aquaculture.[**https://www.fao.org/3/ca9229en/ca9229en.pdf**](https://www.fao.org/3/ca9229en/ca9229en.pdf)
+
+United States Department of Agriculture (USDA) National Agricultural Statistics Service. 2024. 2023 Census of Aquaculture.[ https://www.nass.usda.gov/Publications/AgCensus/2022/Online_Resources/Aquaculture/index.php]( https://www.nass.usda.gov/Publications/AgCensus/2022/Online_Resources/Aquaculture/index.php)
