@@ -4,13 +4,13 @@ format: pdf
 editor: visual
 ---
 
+![README](README.png)
+
 **Author** William Mullins \| Date: December 10, 2025 [View Repository on Github](https://github.com/willrmull/potential_aquaculture.git)
 
 ## Introduction
 
 In this analysis, we identified areas along the west coast of the United States which contained suitable depth and sea surface temperature (SST) for aquaculture, specifically on two species: oysters and blue mussels.
-
-------------------------------------------------------------------------
 
 ### Datasets Used
 
@@ -41,12 +41,6 @@ suppressPackageStartupMessages({
 })
 ```
 
-------------------------------------------------------------------------
-
-### Data Import and Processing
-
-------------------------------------------------------------------------
-
 ### Data Import
 
 The following section imports the three datasets used in the analysis. We implement validation checks to ensure files exist before attempting to load them.
@@ -64,9 +58,10 @@ sst <- rast(c(here("data", "average_annual_sst_2008.tif"),
 
 # Read in depth file
 depth <- rast(here("data", "depth.tif")) %>%
-  project(crs(sst))
+  project(crs(sst), verbose = FALSE) %>%
+  suppressMessages()
 
-eez_raster <- vect(here::here("data", "wc_regions_clean.shp"))
+eez_raster <- vect(here("data", "wc_regions_clean.shp"))
 ```
 
 ### Data Processing
@@ -74,8 +69,10 @@ eez_raster <- vect(here::here("data", "wc_regions_clean.shp"))
 To find the temporal mean SST across the 2008–2012 period, we compute the average across the raster stack. Since the original values are in Kelvin, we convert them to Celsius by subtracting 273.15.
 
 ```{r}
-# Change Margins on top and bottom
-par(oma = c(1, 0, 3, 0))
+mean_sst <- app(sst, fun = mean, na.rm = TRUE)
+
+# Convert from Kelvin to Celsius
+mean_sst <- mean_sst - 273.15
 
 # Create an informative plot of mean SST
 plot(mean_sst,
@@ -83,11 +80,11 @@ plot(mean_sst,
      col = hcl.colors(40, "RdYlBu", rev = TRUE),
      xlab = "Longitude",
      ylab = "Latitude",
-     cex.main = 1.0,
+     cex.main = 0.9,
      plg = list(title = "SST (°C)"))
 ```
 
-\*Interpretation\*\*: This map reveals the characteristic temperature gradient along the US West Coast. Southern California exhibits the warmest waters (20-25°C), while the Pacific Northwest and areas influenced by coastal upwelling show cooler temperatures (10-15°C). This spatial variation in temperature has important implications for species-specific aquaculture siting, as different shellfish species have distinct thermal tolerances.
+**Interpretation**: This map reveals the characteristic temperature gradient along the US West Coast. Southern California exhibits the warmest waters (20-25°C), while the Pacific Northwest and areas influenced by coastal upwelling show cooler temperatures (10-15°C). This spatial variation in temperature has important implications for species-specific aquaculture siting, as different shellfish species have distinct thermal tolerances.
 
 ### Depth Data Preparation
 
@@ -121,7 +118,7 @@ if (!alignment_check) {
 
 To evaluate the potential of locations for marine aquaculture of a given species, we use measurements of environmental tolerances. Using these thresholds, each pixel in the study area is classified as either suitable or unsuitable based on whether it simultaneously satisfies both temperature and depth criteria.
 
-\### Suitability Function
+### Suitability Function
 
 The \`find_suitable_habitat()\` function implements this logic by first generating binary masks for temperature and depth suitability. The rasters are then combined, producing a categorical raster containing locations where both conditions are met.
 
@@ -140,9 +137,6 @@ find_suitable_habitat <- function(temp_min, temp_max, depth_min, depth_max, spec
   suitable_habitat <- as.factor(suitable_habitat)
   levels(suitable_habitat) <- c("Unsuitable", "Suitable")
   
-  # Create informative plot
-  par(oma = c(1, 1, 1.5, 1))
-  
   plot(suitable_habitat,
        col = c("#D3D3D3", "#228B22"),
        type = "classes",
@@ -152,7 +146,7 @@ find_suitable_habitat <- function(temp_min, temp_max, depth_min, depth_max, spec
        axes = TRUE,
        cex.main = 0.8,
        plg = list(x = "topright", title = "Suitability"))
-  
+
   # Return the raster
   return(suitable_habitat)
 }
@@ -160,20 +154,20 @@ find_suitable_habitat <- function(temp_min, temp_max, depth_min, depth_max, spec
 
 ### Map of Potential Oyster Habitats
 
-Oysters prefer slighly warm waters (11-30°C) and are able to be cultivated in shallow depths (0-70 meters).
+Oysters prefer slightly warm waters (11-30°C) and are able to be cultivated in shallow depths (0-70 meters).
 
 ```{r, warning = FALSE, message = FALSE}
 # View Areas Habitable by Oysters
 oyster_habitat <- find_suitable_habitat(
   temp_min = 11,
   temp_max = 30,
-  depth_min = 0,
-  depth_max = 70,
+  depth_min = -70,
+  depth_max = 0,
   species_name = "Oyster"
 )
 ```
 
-**Interpretation**: This map shows that suitable areas are concentrated along the coast of Southern California and in Washington. Cincentration is low along the coast of Northern California and Oregon. The cooler waters of Oregon and Washington limit suitable habitat primarily to nearshore areas where depths fall within the required range.
+**Interpretation**: This map shows that suitable areas are concentrated along the coast of Southern and Central California, with a large area also being present in Washington. Oregon and North California appear to have significantly smaller amounts of suitable area.
 
 ### Map of Potential Mussel Habitats
 
@@ -184,11 +178,13 @@ The species of blue mussels native to the West Coast, *Mytilus trossulus*, are m
 mussel_habitat <- find_suitable_habitat(
   temp_min = -1,
   temp_max = 20,
-  depth_min = 0,
-  depth_max = 24,
+  depth_min = -24,
+  depth_max = 0,
   species_name = "Blue Mussel"
 )
 ```
+
+**Interpretation**: This map shows that suitable areas are primarily found within Washington, with a large cluster also being present in the Bay area. Outside of that, mussels appear to have a much smaller amount of suitable area in comparison to Oysters overall.
 
 ## **Regional Analysis of Suitable Habitat**
 
@@ -232,16 +228,16 @@ total_habitable_areas <- function(temp_min, temp_max, depth_min, depth_max, spec
 oyster_area <- total_habitable_areas(
   temp_min = 11,
   temp_max = 30,
-  depth_min = 0,
-  depth_max = 70,
+  depth_min = -70,
+  depth_max = 0,
   species_name = "Oyster") %>% 
   rename("Oysters" = area)
 
 mussel_area <- total_habitable_areas(  
   temp_min = -1,
   temp_max = 20,
-  depth_min = 0,
-  depth_max = 24,
+  depth_min = -24,
+  depth_max = 0,
   species_name = "Blue Mussel") %>%
   rename("Blue Mussle" = area)
 
@@ -266,19 +262,21 @@ habitat_summary
 
 **Interpretation**:
 
-1.  **Washington** has the most suitable habitat for blue mussels (260.91 km²), which is more than double all of the other regions. This is likely caused by the cold waters of the state and large amount of shallow water found in regions like the Puget Sound.
+1.  **Washington** has the most suitable habitat for blue mussels (2878.92 km²), which is more than a thousand higher than the next highest region. This is likely caused by the cold waters of the state and large amount of shallow water found in regions like the Puget Sound.
 
-2.  **Southern California** leads in oyster habitat suitability (160.53 km²), likely due to their warmer waters.
+2.  **Central California** leads in oyster habitat suitability (1578.97 km²), likely due to their warmer waters. In this region there is a significant disparity between suitable oyster habitat and mussel habitat.
 
-3.  **Oregon** shows a strong preference for mussels over oysters (76.65 km² vs. 30.11 km²), which is expected to to it's cooler waters.
+3.  **Oregon** shows a slight preference for mussels over oysters (76.65 km² vs. 1181.82 km²), which could be caused by it's slightly cooler waters or a limited amount of shallow areas.
 
-4.  **Central California** shows relatively low suitability for both species. It is unclear if this is caused by the temperature range or a lack of shallow waters.
+4.  **Southern California** shows high suitability for oysters (4221.39 km²) with below average suitability for mussels.
+
+5.  **Northern California** seems to be rather unaccommodating for both species, though mussels are somewhat favored.
 
 ### Implications for Aquaculture Development
 
-Although the West Coast appears to have a larger total area suited to blue mussels, oyster farming currently dominates every region. This mismatch between environmental suitability and current industry patterns may indicate **untapped potential for blue mussel aquaculture**, particularly in Washington and Oregon where there is a significantly larger area suitable for mussels than oysters.
+While oyster farming currently dominates all regions, the results of this analysis suggest this may not entirely align with maximizing the environment's potential for aquaculture. Specifically, Central and Southern California's substantial oyster-suitable areas (4,940 km² and 4,221 km² respectively) support continued industry focus on oysters in these regions. However, Northern California presents a compelling case for blue mussel expansion, as mussel-suitable habitat (749 km²) actually exceeds oyster-suitable area (454 km²), which is not reflected in current farming practices. Additionally, Washington and Oregon have much closer margins in suitable areas between the two species, which could be worth investigating for aquaculture diversification. Overall, more analysis should be done to determine the extent to which these suitable areas overlap, and whether other parameters such as local infrastructure, market access, regulatory frameworks, or additional environmental factors may affect habitat suitability and commercial viability.
 
-### **Limitations**
+**Limitations**
 
 While this analysis provides a solid foundation for further research, it has some limitations that should be addressed in future research:
 
@@ -288,7 +286,7 @@ While this analysis provides a solid foundation for further research, it has som
 
 3.  **Socioeconomic and Regulatory Constraints**: Shipping lanes, marine protected areas, and competing ocean uses were not incorporated into the suitability model.
 
-## Future research 
+## Future research
 
 In addition to adressing the above limitation, future research should investigate the economic viability of establishing mussel production in areas identified as suitable. Additionally, climate forecast should be included in the analysis to see if sites are likely to remain suitable in the future.
 
